@@ -5,6 +5,7 @@ import numpy as np
 import pygame
 from OpenGL.GL import *
 from OpenGL.GL import shaders
+from OpenGL.GLUT import *
 
 class MainView:
 	def __init__(self):
@@ -17,7 +18,7 @@ class MainView:
 
 	def init_window(self):
 		pygame.init()
-		pygame.display.set_mode(self.resolution, pygame.OPENGL|pygame.DOUBLEBUF|pygame.RESIZABLE)
+		pygame.display.set_mode(self.resolution, pygame.OPENGL|pygame.DOUBLEBUF|pygame.NOFRAME|pygame.RESIZABLE)
 		pygame.display.set_caption('PyGL')
 
 	def init_shaders(self):

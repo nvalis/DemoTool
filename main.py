@@ -35,8 +35,8 @@ class MainView:
 		while self.running:
 			self.handle_events()
 			self.draw()
-			frame_time = self.clock.tick(self.target_fps)
-			#print('Current FPS: {:.1f}/{}'.format(1/(frame_time/1000), self.target_fps))
+			self.clock.tick(self.target_fps)
+			#print('Current FPS: {:.1f}/{}'.format(self.clock.get_fps(), self.target_fps))
 
 	def handle_events(self):
 		for event in pygame.event.get():
@@ -48,11 +48,12 @@ class MainView:
 	def resize(self, resolution):
 		print('Window resized to {}x{}'.format(*resolution))
 		self.resolution = resolution
+		glViewport(0,0, *self.resolution)
 
 	def draw(self):
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 		glUseProgram(self.program)
-		glUniform2f(self.uniforms['resolution'], *self.resolution)
+		glUniform2fv(self.uniforms['resolution'], 1, self.resolution)
 		glDrawArrays(GL_POINTS, 0, 1) # dummy vbo
 		pygame.display.flip()
 

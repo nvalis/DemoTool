@@ -1,8 +1,11 @@
 #version 450
 
 layout(points) in;
-layout(triangle_strip, max_vertices = 4) out;
+layout(triangle_strip, max_vertices=4) out;
 
+//out gl_PerVertex { vec4 gl_Position; }; // might be needed on weird error
+
+// Fullscreen Quad
 // from http://stackoverflow.com/a/9343057
 
 void main() {

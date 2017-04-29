@@ -16,7 +16,7 @@ class Shader:
 		self.vert_geom_program = None
 		self.frag_program = None
 		self.program = None
-		self._load_shader_code(GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER)
+		self._load_shader_code(*self.shader_paths.keys())
 
 	def __str__(self):
 		return '<Shader: {}>'.format(', '.join(['{}:{}'.format(s.name, p) for s, p in self.shader_paths.items()]))
@@ -25,14 +25,14 @@ class Shader:
 		for shader in shaders:
 			self.code[shader] = open(self.shader_paths[shader]).read()
 
-	def create_shader(self, shader_string, shader_type):
+	def _create_shader(self, shader_string, shader_type):
 		shader = glCreateShader(shader_type)
 		glShaderSource(shader, shader_string)
 		glCompileShader(shader)
-		self.check_shader_status(shader)
+		self._check_shader_status(shader)
 		return shader
 
-	def check_shader_status(self, shader):
+	def _check_shader_status(self, shader):
 		if glGetShaderiv(shader, GL_COMPILE_STATUS) != GL_TRUE:
 			log = glGetShaderInfoLog(shader)
 			glDeleteShader(shader)
@@ -42,7 +42,7 @@ class Shader:
 		else:
 			self.logger.debug('Shader compiling successful')
 
-	def check_program_status(self, program):
+	def _check_program_status(self, program):
 		if glGetProgramiv(program, GL_LINK_STATUS) != GL_TRUE:
 			log = glGetProgramInfoLog(program)
 			glDeleteProgram(program)
@@ -63,9 +63,9 @@ class Shader:
 		glProgramParameteri(self.vert_geom_program, GL_PROGRAM_SEPARABLE, GL_TRUE)
 		glProgramParameteri(self.frag_program, GL_PROGRAM_SEPARABLE, GL_TRUE)
 
-		vert = self.create_shader(self.code[GL_VERTEX_SHADER], GL_VERTEX_SHADER)
-		geom = self.create_shader(self.code[GL_GEOMETRY_SHADER], GL_GEOMETRY_SHADER)
-		frag = self.create_shader(self.code[GL_FRAGMENT_SHADER], GL_FRAGMENT_SHADER)
+		vert = self._create_shader(self.code[GL_VERTEX_SHADER], GL_VERTEX_SHADER)
+		geom = self._create_shader(self.code[GL_GEOMETRY_SHADER], GL_GEOMETRY_SHADER)
+		frag = self._create_shader(self.code[GL_FRAGMENT_SHADER], GL_FRAGMENT_SHADER)
 
 		glAttachShader(self.vert_geom_program, vert)
 		glAttachShader(self.vert_geom_program, geom)
@@ -74,9 +74,9 @@ class Shader:
 		glBindFragDataLocation(self.frag_program, 0, 'FragColor')
 
 		glLinkProgram(self.vert_geom_program)
-		self.check_program_status(self.vert_geom_program)
+		self._check_program_status(self.vert_geom_program)
 		glLinkProgram(self.frag_program)
-		self.check_program_status(self.frag_program)
+		self._check_program_status(self.frag_program)
 
 		glDetachShader(self.vert_geom_program, vert)
 		glDeleteShader(vert)
@@ -94,26 +94,19 @@ class Shader:
 		# "fixed" pipeline
 		self.program = glCreateProgram()
 
-		vert = self.create_shader(self.code[GL_VERTEX_SHADER], GL_VERTEX_SHADER)
-		geom = self.create_shader(self.code[GL_GEOMETRY_SHADER], GL_GEOMETRY_SHADER)
-		frag = self.create_shader(self.code[GL_FRAGMENT_SHADER], GL_FRAGMENT_SHADER)
+		shaders = [self._create_shader(self.code[t], t) for t in self.shader_paths.keys()]
 
-		glAttachShader(self.program, vert)
-		glAttachShader(self.program, geom)
-		glAttachShader(self.program, frag)
+		for s in shaders: glAttachShader(self.program, s)
 
 		glBindFragDataLocation(self.program, 0, 'FragColor')
 
 		glLinkProgram(self.program)
-		self.check_program_status(self.program)
+		self._check_program_status(self.program)
 
-		glDetachShader(self.program, vert)
-		glDeleteShader(vert)
-		glDetachShader(self.program, geom)
-		glDeleteShader(geom)
-		glDetachShader(self.program, frag)
-		glDeleteShader(frag)
-
+		for s in shaders:
+			glDetachShader(self.program, s)
+			glDeleteShader(s)
+		
 		self.logger.info('Compiled the shader program in {:.1f} ms'.format((time.time()-start)*1000))
 
 	def add_uniform(self, uniform_name, setter, *args):

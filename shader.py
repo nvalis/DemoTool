@@ -16,13 +16,12 @@ class Shader:
 		self.vert_geom_program = None
 		self.frag_program = None
 		self.program = None
-		self.load_shader_code(GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER)
-		self.get_gl_info()
+		self._load_shader_code(GL_VERTEX_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER)
 
 	def __str__(self):
 		return '<Shader: {}>'.format(', '.join(['{}:{}'.format(s.name, p) for s, p in self.shader_paths.items()]))
 
-	def load_shader_code(self, *shaders):
+	def _load_shader_code(self, *shaders):
 		for shader in shaders:
 			self.code[shader] = open(self.shader_paths[shader]).read()
 
@@ -52,13 +51,6 @@ class Shader:
 			raise RuntimeError('Failed to link program')
 		else:
 			self.logger.debug('Program linking successful')
-
-	def get_gl_info(self):
-		self.logger.debug('Vendor    : {}'.format(glGetString(GL_VENDOR).decode()))
-		self.logger.debug('Renderer  : {}'.format(glGetString(GL_RENDERER).decode()))
-		self.logger.debug('Version   : {}'.format(glGetString(GL_VERSION).decode()))
-		self.logger.debug('SL Version: {}'.format(glGetString(GL_SHADING_LANGUAGE_VERSION).decode()))
-		#self.logger.debug('Extensions: {}'.format(glGetString(GL_EXTENSIONS).decode()))
 
 	def create_program(self):
 		start = time.time()

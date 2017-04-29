@@ -16,12 +16,20 @@ class MainView:
 		fileConfig('log.conf')
 		self.logger = logging.getLogger(type(self).__name__)
 
-		self.resolution = (800,600)
+		self.resolution = (800,450)
 		self.target_FPS = 60
 
 		self.init_window()
+		self.get_gl_info()
 		self.init_shaders()
 		self.main_loop()
+
+	def get_gl_info(self):
+		self.logger.info('Vendor    : {}'.format(glGetString(GL_VENDOR).decode()))
+		self.logger.info('Renderer  : {}'.format(glGetString(GL_RENDERER).decode()))
+		self.logger.info('Version   : {}'.format(glGetString(GL_VERSION).decode()))
+		self.logger.info('SL Version: {}'.format(glGetString(GL_SHADING_LANGUAGE_VERSION).decode()))
+		#self.logger.debug('Extensions: {}'.format(glGetString(GL_EXTENSIONS).decode()))
 
 	def init_shaders(self):
 		self.shader = Shader({GL_VERTEX_SHADER:'shader.vert', GL_GEOMETRY_SHADER:'shader.geom', GL_FRAGMENT_SHADER:'shader.frag'})

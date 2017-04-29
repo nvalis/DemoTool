@@ -34,7 +34,7 @@ class MainView:
 	def init_shaders(self):
 		self.shader = Shader({GL_VERTEX_SHADER:'shader.vert', GL_GEOMETRY_SHADER:'shader.geom', GL_FRAGMENT_SHADER:'shader.frag'})
 		self.shader.create_program()
-		self.shader.add_uniforms([('resolution', glUniform2fv, 1), ('time', glUniform1f)])
+		self.shader.add_uniforms(['resolution', 'time'])
 		self.logger.debug('Shader program initialized')
 
 	def init_window(self):
@@ -62,10 +62,10 @@ class MainView:
 		while not glfw.window_should_close(self.window):
 			frame_start_time = glfw.get_time()
 			glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-			glUseProgram(self.shader.program)
+			self.shader.bind()
 			self.shader.set_uniforms({'resolution':self.resolution, 'time':glfw.get_time()})
 			glDrawArrays(GL_POINTS, 0, 1) # dummy vbo
-			glUseProgram(0)
+			self.shader.unbind()
 			glfw.swap_buffers(self.window)
 			glfw.poll_events()
 			self.wait_for_frame_end(frame_start_time)

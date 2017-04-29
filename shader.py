@@ -10,18 +10,14 @@ class Shader:
 		self.logger = logging.getLogger(type(self).__name__)
 
 		self.shader_paths = shader_paths
-		self.code = {}
 		self.uniform_locations = {}
-		self.uniform_setters = {}
-		self.vert_geom_program = None
-		self.frag_program = None
-		self.program = None
 		self._load_shader_code(*self.shader_paths.keys())
 
 	def __str__(self):
 		return '<Shader: {}>'.format(', '.join(['{}:{}'.format(s.name, p) for s, p in self.shader_paths.items()]))
 
 	def _load_shader_code(self, *shaders):
+		self.code = {}
 		for shader in shaders:
 			self.code[shader] = open(self.shader_paths[shader]).read()
 
@@ -79,14 +75,13 @@ class Shader:
 		self._check_program_status(self.frag_program)
 
 		glDetachShader(self.vert_geom_program, vert)
-		glDeleteShader(vert)
 		glDetachShader(self.vert_geom_program, geom)
+		glDeleteShader(vert)
 		glDeleteShader(geom)
 		glDetachShader(self.frag_program, frag)
 		glDeleteShader(frag)
 
 		self.program = glGenProgramPipelines(1)
-
 		glUseProgramStages(self.program, GL_VERTEX_SHADER_BIT | GL_GEOMETRY_SHADER_BIT, self.vert_geom_program)
 		glUseProgramStages(self.program, GL_FRAGMENT_SHADER_BIT, self.frag_program)
 		'''
@@ -106,25 +101,35 @@ class Shader:
 		for s in shaders:
 			glDetachShader(self.program, s)
 			glDeleteShader(s)
-		
+
 		self.logger.info('Compiled the shader program in {:.1f} ms'.format((time.time()-start)*1000))
 
-	def add_uniform(self, uniform_name, setter, *args):
+	def bind(self):
+		glUseProgram(self.program)
+
+	def unbind(self):
+		glUseProgram(0)
+
+	def add_uniform(self, uniform_name):
 		self.uniform_locations[uniform_name] = glGetUniformLocation(self.program, uniform_name)
-		self.uniform_setters[uniform_name] = [setter, args]
 
 	def add_uniforms(self, uniform_list):
 		for u in uniform_list:
-			self.add_uniform(*u)
+			self.add_uniform(u)
 
 	def get_uniform_location(self, uniform_name):
 		return self.uniform_locations[uniform_name]
 
-	def set_uniform(self, uniform_name, value):
-		#self.logger.debug('Setting uniform \'{}\' to {}'.format(uniform_name, value))
-		setter, args = self.uniform_setters[uniform_name]
-		loc = self.get_uniform_location(uniform_name)
-		setter(loc, *args, value)
+	def set_uniform(self, name, vals):
+		if isinstance(vals, (int,float)):
+			vals = (vals,)
+
+		l = len(vals)
+		setter = {1:glUniform1f, 2:glUniform2f, 3:glUniform3f, 4:glUniform4f}[l]
+		if l in range(1,5):
+			setter(self.uniform_locations[name], *vals)
+		else:
+			self.logger.warning('Nonvalid length for uniform \'{}\': {}'.format(uniform_name, l))
 
 	def set_uniforms(self, uniform_dict):
 		for name, value in uniform_dict.items():

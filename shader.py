@@ -121,9 +121,8 @@ class Shader:
 		return self.uniform_locations[uniform_name]
 
 	def set_uniform(self, name, vals):
-		if isinstance(vals, (int,float)):
-			vals = (vals,)
-
+		# TODO: implement setting of matrices?
+		if isinstance(vals, (int,float)): vals = (vals,)
 		l = len(vals)
 		setter = {1:glUniform1f, 2:glUniform2f, 3:glUniform3f, 4:glUniform4f}[l]
 		if l in range(1,5):

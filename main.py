@@ -48,7 +48,7 @@ class MainView:
 		glClearColor(0,0,0,1)
 		self.target_frame_time = 1/self.target_fps
 
-		self.fps_viewer = Text('Hack-Regular.ttf', size=20)
+		self.fps_viewer = Text('assets/Hack-Regular.ttf', size=20)
 		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
 		glEnable(GL_BLEND)
 		glEnable(GL_COLOR_MATERIAL)

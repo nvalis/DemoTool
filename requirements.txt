@@ -1,5 +1,7 @@
 appdirs==1.4.3
+freetype-py==1.0.2
 glfw==1.4.0
+numpy==1.12.1
 packaging==16.8
 PyOpenGL==3.1.0
 PyOpenGL-accelerate==3.1.0

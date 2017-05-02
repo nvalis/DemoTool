@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import time
 import logging
 from logging.config import fileConfig
+import numpy as np
 
 from OpenGL.GL import *
 import glfw
 
 from shader import Shader
+from camera import Camera
 from text import Text
+from ui import UI
 
 
 class MainView:
@@ -23,7 +27,8 @@ class MainView:
 
 		self.init_window()
 		self.get_gl_info()
-		self.init_shaders()
+		self.init_shader()
+		self.init_camera()
 		self.main_loop()
 
 	def get_gl_info(self):
@@ -33,11 +38,19 @@ class MainView:
 		self.logger.info('SL Version: {}'.format(glGetString(GL_SHADING_LANGUAGE_VERSION).decode()))
 		#self.logger.debug('Extensions: {}'.format(glGetString(GL_EXTENSIONS).decode()))
 
-	def init_shaders(self):
+	def get_shader_time(self):
+		return os.path.getmtime('shader.frag')
+
+	def init_shader(self):
 		self.shader = Shader({GL_VERTEX_SHADER:'shader.vert', GL_GEOMETRY_SHADER:'shader.geom', GL_FRAGMENT_SHADER:'shader.frag'})
-		self.shader.create_program()
-		self.shader.add_uniforms(['resolution', 'time'])
+		self.shader.create()
+		self.shader_time = self.get_shader_time()
+		self.freeze_time = False
+		self.time = 0.
 		self.logger.debug('Shader program initialized')
+
+	def init_camera(self):
+		self.camera = Camera()
 
 	def init_window(self):
 		glfw.init()
@@ -45,17 +58,11 @@ class MainView:
 		glfw.make_context_current(self.window)
 		glfw.set_window_size_callback(self.window, self.resize)
 		glfw.set_key_callback(self.window, self.keyboard_input)
+		glfw.set_scroll_callback(self.window, self.scroll_input);
 		glClearColor(0,0,0,1)
 		self.target_frame_time = 1/self.target_fps
 
-		self.fps_viewer = Text('assets/Hack-Regular.ttf', size=20)
-		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
-		glEnable(GL_BLEND)
-		glEnable(GL_COLOR_MATERIAL)
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-		glEnable(GL_TEXTURE_2D)
-
+		self.ui = UI(self)
 		self.logger.debug('Window initialized')
 
 	def resize(self, win, width, height):
@@ -64,10 +71,36 @@ class MainView:
 		glViewport(0, 0, *self.resolution)
 
 	def keyboard_input(self, win, key, scancode, action, mods):
-		self.logger.debug('key: {}, scancode: {}, action: {}, mods: {}'.format(key, scancode, action, mods))
-		if ((key == glfw.KEY_ESCAPE) or (key == glfw.KEY_F4 and mods == glfw.MOD_ALT) and action == glfw.PRESS):
+		#self.logger.debug('key: {}, scancode: {}, action: {}, mods: {}'.format(key, scancode, action, mods))
+		if (key == glfw.KEY_ESCAPE) or (mods == glfw.MOD_ALT and key == glfw.KEY_F4) and action == glfw.PRESS:
 			glfw.set_window_should_close(self.window, True)
 			self.logger.info('Exiting')
+		if key == glfw.KEY_H and action == glfw.PRESS:
+			self.ui.toggle_visibility()
+			self.logger.debug('Toggle UI')
+		if key == glfw.KEY_W and action != glfw.RELEASE:
+			self.camera.move_forward()
+		if key == glfw.KEY_A and action != glfw.RELEASE:
+			self.camera.move_left()
+		if key == glfw.KEY_S and action != glfw.RELEASE:
+			self.camera.move_backward()
+		if key == glfw.KEY_D and action != glfw.RELEASE:
+			self.camera.move_right()
+		if key == glfw.KEY_Q and action != glfw.RELEASE:
+			self.camera.move_up()
+		if key == glfw.KEY_E and action != glfw.RELEASE:
+			self.camera.move_down()
+		if key == glfw.KEY_R and action == glfw.PRESS:
+			self.camera.reset()
+		if key == glfw.KEY_P and action == glfw.PRESS:
+			self.freeze_time = not self.freeze_time
+			self.logger.info('Toggle time freeze')
+
+	def scroll_input(self, win, x, y):
+		if y > 0:
+			self.camera.accelerate()
+		elif y < 0:
+			self.camera.decelerate()
 
 	def wait_for_frame_end(self, frame_start_time):
 		frame_render_time = glfw.get_time()-frame_start_time
@@ -77,25 +110,43 @@ class MainView:
 		if sleep_time > 0:
 			time.sleep(sleep_time)
 
+	def check_for_shader_change(self):
+		current_time = self.get_shader_time()
+		if current_time != self.shader_time:
+			self.shader_time = current_time
+			self.shader.create()
+
 	def main_loop(self):
 		while not glfw.window_should_close(self.window):
 			frame_start_time = glfw.get_time()
+			if not self.freeze_time:
+				self.time = frame_start_time
+
 			glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
 			# Draw scene
 			self.shader.bind()
-			self.shader.set_uniforms({'resolution':self.resolution, 'time':glfw.get_time()})
+			self.shader.set_uniforms(
+				{
+					'resolution':self.resolution,
+					'time':self.time,
+					'camera_offset':self.camera.offset
+				}
+			)
 			glDrawArrays(GL_POINTS, 0, 1) # dummy vbo
 			self.shader.unbind()
 
-			# Draw text
-			glPushMatrix()
-			glTranslate(-.9, .8, 0)
-			glScale(1/self.resolution[0], 1/self.resolution[1], 1)
-			self.fps_viewer.draw('{:4.0f}/{:2.0f} FPS, {:4.1f} ms ({:3.0f}%)'.format(1/self.frame_render_time, self.target_fps, self.frame_render_time*1000, self.frame_render_time/self.target_frame_time*100))
-			glPopMatrix()
+			# Draw UI
+			self.ui.draw(
+				{
+					'fps_label':'{:4.0f}/{:2.0f} FPS, {:4.1f} ms ({:3.0f}%)'.format(1/self.frame_render_time, self.target_fps, self.frame_render_time*1000, self.frame_render_time/self.target_frame_time*100),
+					'time_label':'Time: {:4.2f} s {}'.format(self.time, '[f]' if self.freeze_time else ''),
+					'camera_label':'Camera: [{:4.2f}, {:4.2f}, {:4.2f}] ({:.1f}%)'.format(*self.camera.offset, self.camera.speed*100)
+				}
+			)
 
 			glfw.swap_buffers(self.window)
+			self.check_for_shader_change()
 			self.wait_for_frame_end(frame_start_time)
 			glfw.poll_events()
 		glfw.terminate()

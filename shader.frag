@@ -6,6 +6,8 @@ out vec4 FragColor;
 uniform float time;
 uniform vec2 resolution;
 
+uniform vec3 camera_offset;
+
 #define EPS 1e-4
 
 // http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
@@ -28,8 +30,8 @@ float sdBox(vec3 p, vec3 b) {
 	return min(max(d.x,max(d.y,d.z)),0.)+length(max(d,0.));
 }
 
-float refd = 1./0.;
-float refrd = 1./0.;
+float refd = 9e99;
+float refrd = 9e99;
 float scene(vec3 p){
 	refd = sdSphere(p, .5);
 	refrd = sdSphere(p+vec3(.6,.4,.4), .1);
@@ -111,8 +113,19 @@ void main(void) {
 	vec3 lp = vec3(-2.,3.5,3.5);
 	//vec3 ro = vec3(-1.5-.2*sin(time),-.2+.2*cos(time),1.+.8*cos(time));
 	vec3 ro = vec3(-1.5,-.2,1.);
-	vec3 rd = camera(ro, vec3(-.2,-.3,-.2), 0.)*normalize(vec3(uv.xy, -1.));
-	
+	vec3 t = vec3(-.2,-.3,-.2);
+	float rot = 0.;
+
+	// camera setup
+	vec3 f = normalize(t-ro);
+	vec3 u = vec3(sin(rot),cos(rot),0.);
+	vec3 r = cross(f,u);
+	mat3 c = mat3(r,u,-f);
+	vec3 rd = c * normalize(vec3(uv.xy, -1.));
+
+	// camera control
+	ro += c*camera_offset;
+
 	vec3 color;
 	if (abs(uv.y) < 0.4) {
 		vec3 p;
@@ -126,5 +139,4 @@ void main(void) {
 	}
 	
 	FragColor = vec4((pow(color, vec3(1./1.3))+0.04*rand(3.*uv)), 1.);
-
 }

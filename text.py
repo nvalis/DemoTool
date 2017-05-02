@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import numpy as np
 
 from OpenGL.GL import *
@@ -5,8 +7,10 @@ from freetype import *
 
 # code from: https://github.com/rougier/freetype-py/blob/master/examples/opengl.py
 
+
 class Text:
-	def __init__(self, font_filename, size=64):
+	def __init__(self, position, font_filename='assets/Hack-Regular.ttf', size=14):
+		self.position = position
 		self.face = Face(font_filename)
 		self.face.set_char_size(size*64)
 		if not self.face.is_fixed_width:
@@ -65,7 +69,7 @@ class Text:
 
 	def draw(self, text):
 		glBindTexture(GL_TEXTURE_2D, self.texid)
-		glColor(1,1,1,.8)
+		glColor(1,1,1,1)
 		glPushMatrix()
 		glListBase(self.base)
 		glCallLists([ord(c) for c in text])

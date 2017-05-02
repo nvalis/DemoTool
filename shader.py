@@ -10,6 +10,7 @@ class Shader:
 		self.logger = logging.getLogger(type(self).__name__)
 
 		self.shader_paths = shader_paths
+		self.program = None
 		self.uniform_locations = {}
 		self._load_shader_code(*self.shader_paths.keys())
 
@@ -21,34 +22,29 @@ class Shader:
 		for shader in shaders:
 			self.code[shader] = open(self.shader_paths[shader]).read()
 
-	def _create_shader(self, shader_string, shader_type):
+	def _compile_shader(self, shader_string, shader_type):
 		shader = glCreateShader(shader_type)
 		glShaderSource(shader, shader_string)
 		glCompileShader(shader)
-		self._check_shader_status(shader)
+		s = self._check_shader_status(shader)
+		if s:
+			self.logger.error(s.replace('\n', '\n\t'))
+			raise RuntimeError('Failed to compile {}'.format(shader_type))
 		return shader
 
 	def _check_shader_status(self, shader):
 		if glGetShaderiv(shader, GL_COMPILE_STATUS) != GL_TRUE:
 			log = glGetShaderInfoLog(shader)
 			glDeleteShader(shader)
-			self.logger.critical('Error compiling shader')
-			print(log.decode())
-			raise RuntimeError('Failed to compile shader')
-		else:
-			self.logger.debug('Shader compiling successful')
+			return log.decode()
 
 	def _check_program_status(self, program):
 		if glGetProgramiv(program, GL_LINK_STATUS) != GL_TRUE:
 			log = glGetProgramInfoLog(program)
 			glDeleteProgram(program)
-			self.logger.critical('Error linking program')
-			print(log.decode())
-			raise RuntimeError('Failed to link program')
-		else:
-			self.logger.debug('Program linking successful')
+			return log.decode()
 
-	def create_program(self):
+	def _create_program(self):
 		start = time.time()
 
 		'''
@@ -59,9 +55,9 @@ class Shader:
 		glProgramParameteri(self.vert_geom_program, GL_PROGRAM_SEPARABLE, GL_TRUE)
 		glProgramParameteri(self.frag_program, GL_PROGRAM_SEPARABLE, GL_TRUE)
 
-		vert = self._create_shader(self.code[GL_VERTEX_SHADER], GL_VERTEX_SHADER)
-		geom = self._create_shader(self.code[GL_GEOMETRY_SHADER], GL_GEOMETRY_SHADER)
-		frag = self._create_shader(self.code[GL_FRAGMENT_SHADER], GL_FRAGMENT_SHADER)
+		vert = self._compile_shader(self.code[GL_VERTEX_SHADER], GL_VERTEX_SHADER)
+		geom = self._compile_shader(self.code[GL_GEOMETRY_SHADER], GL_GEOMETRY_SHADER)
+		frag = self._compile_shader(self.code[GL_FRAGMENT_SHADER], GL_FRAGMENT_SHADER)
 
 		glAttachShader(self.vert_geom_program, vert)
 		glAttachShader(self.vert_geom_program, geom)
@@ -81,44 +77,65 @@ class Shader:
 		glDetachShader(self.frag_program, frag)
 		glDeleteShader(frag)
 
-		self.program = glGenProgramPipelines(1)
-		glUseProgramStages(self.program, GL_VERTEX_SHADER_BIT | GL_GEOMETRY_SHADER_BIT, self.vert_geom_program)
-		glUseProgramStages(self.program, GL_FRAGMENT_SHADER_BIT, self.frag_program)
+		program = glGenProgramPipelines(1)
+		glUseProgramStages(program, GL_VERTEX_SHADER_BIT | GL_GEOMETRY_SHADER_BIT, self.vert_geom_program)
+		glUseProgramStages(program, GL_FRAGMENT_SHADER_BIT, self.frag_program)
 		'''
 
 		# "fixed" pipeline
-		self.program = glCreateProgram()
+		shaders = []
+		for t in self.shader_paths.keys():
+			try:
+				s = self._compile_shader(self.code[t], t)
+				shaders.append(s)
+			except RuntimeError:
+				self.logger.error('Failed to compile {} shader!'.format(t))
+				return
 
-		shaders = [self._create_shader(self.code[t], t) for t in self.shader_paths.keys()]
+		program = glCreateProgram()
+		for s in shaders: glAttachShader(program, s)
 
-		for s in shaders: glAttachShader(self.program, s)
+		glBindFragDataLocation(program, 0, 'FragColor')
 
-		glBindFragDataLocation(self.program, 0, 'FragColor')
-
-		glLinkProgram(self.program)
-		self._check_program_status(self.program)
+		glLinkProgram(program)
+		try:
+			self._check_program_status(program)
+		except RuntimeError:
+			self.logger.error('Failed to create program!')
+			return
 
 		for s in shaders:
-			glDetachShader(self.program, s)
+			glDetachShader(program, s)
 			glDeleteShader(s)
 
 		self.logger.info('Compiled the shader program in {:.1f} ms'.format((time.time()-start)*1000))
+		return program
+
+	def create(self):
+		if self.program:
+			glDeleteProgram(self.program)
+			self.program = None
+		self._load_shader_code(*self.shader_paths.keys())
+		program = self._create_program()
+		if program:
+			self.program = program
+		self.parse_uniforms()
 
 	def bind(self):
-		glUseProgram(self.program)
+		if self.program:
+			glUseProgram(self.program)
 
 	def unbind(self):
 		glUseProgram(0)
 
-	def add_uniform(self, uniform_name):
+	def parse_uniforms(self):
+		for l in self.code[GL_FRAGMENT_SHADER].splitlines():
+			if l.startswith('uniform'):
+				self._add_uniform(l.split()[-1].replace(';', ''))
+		self.logger.debug('Parsed uniforms: {}'.format(', '.join(self.uniform_locations.keys())))
+
+	def _add_uniform(self, uniform_name):
 		self.uniform_locations[uniform_name] = glGetUniformLocation(self.program, uniform_name)
-
-	def add_uniforms(self, uniform_list):
-		for u in uniform_list:
-			self.add_uniform(u)
-
-	def get_uniform_location(self, uniform_name):
-		return self.uniform_locations[uniform_name]
 
 	def set_uniform(self, name, vals):
 		# TODO: implement setting of matrices?
@@ -126,7 +143,10 @@ class Shader:
 		l = len(vals)
 		setter = {1:glUniform1f, 2:glUniform2f, 3:glUniform3f, 4:glUniform4f}[l]
 		if l in range(1,5):
-			setter(self.uniform_locations[name], *vals)
+			if name in self.uniform_locations:
+				setter(self.uniform_locations[name], *vals)
+			else:
+				self.logger.error('No such uniform \'{}\''.format(name))
 		else:
 			self.logger.warning('Nonvalid length for uniform \'{}\': {}'.format(uniform_name, l))
 
@@ -138,7 +158,6 @@ if __name__ == '__main__':
 	import pygame
 
 	pygame.init()
-	test = Shader({GL_VERTEX_SHADER:'shader.vert', GL_GEOMETRY_SHADER:'shader.geom', GL_FRAGMENT_SHADER:'shader.frag'})
-	print(test)
-	test.create_program()
-	print(test.program)
+	shader = Shader({GL_VERTEX_SHADER:'shader.vert', GL_GEOMETRY_SHADER:'shader.geom', GL_FRAGMENT_SHADER:'shader.frag'})
+	print(shader)
+	shader.create()

@@ -21,7 +21,7 @@ class UI:
 		}
 
 		self.composition_overlay_enabled = True
-		self.overlay_shader = Shader({GL_VERTEX_SHADER:'shader.vert', GL_GEOMETRY_SHADER:'shader.geom', GL_FRAGMENT_SHADER:'composition.frag'})
+		self.overlay_shader = Shader({GL_VERTEX_SHADER:'shaders/shader.vert', GL_GEOMETRY_SHADER:'shaders/shader.geom', GL_FRAGMENT_SHADER:'shaders/composition.frag'})
 		self.overlay_shader.create()
 		self.logger.debug('Initialized UI')
 

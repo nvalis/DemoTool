@@ -39,10 +39,10 @@ class MainView:
 		#self.logger.debug('Extensions: {}'.format(glGetString(GL_EXTENSIONS).decode()))
 
 	def get_shader_time(self):
-		return os.path.getmtime('shader.frag')
+		return os.path.getmtime('shaders/shader.frag')
 
 	def init_shader(self):
-		self.shader = Shader({GL_VERTEX_SHADER:'shader.vert', GL_GEOMETRY_SHADER:'shader.geom', GL_FRAGMENT_SHADER:'shader.frag'})
+		self.shader = Shader({GL_VERTEX_SHADER:'shaders/shader.vert', GL_GEOMETRY_SHADER:'shaders/shader.geom', GL_FRAGMENT_SHADER:'shaders/shader.frag'})
 		self.shader.create()
 		self.shader_time = self.get_shader_time()
 		self.freeze_time = False

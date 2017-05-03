@@ -9,7 +9,7 @@ from freetype import *
 
 
 class Text:
-	def __init__(self, position, font_filename='assets/Hack-Regular.ttf', size=14):
+	def __init__(self, position, font_filename='assets/Hack-Regular.ttf', size=30):
 		self.position = position
 		self.face = Face(font_filename)
 		self.face.set_char_size(size*64)

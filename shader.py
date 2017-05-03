@@ -2,7 +2,7 @@
 
 import time
 import logging
-
+import numpy as np
 from OpenGL.GL import *
 
 class Shader:
@@ -139,16 +139,28 @@ class Shader:
 
 	def set_uniform(self, name, vals):
 		# TODO: implement setting of matrices?
-		if isinstance(vals, (int,float)): vals = (vals,)
-		l = len(vals)
-		setter = {1:glUniform1f, 2:glUniform2f, 3:glUniform3f, 4:glUniform4f}[l]
-		if l in range(1,5):
-			if name in self.uniform_locations:
-				setter(self.uniform_locations[name], *vals)
+		if isinstance(vals, (int,float)): vals = np.array([vals])
+		dim = len(vals.shape)
+		if dim == 1: # scalar/vector
+			l = vals.shape[0]
+			if l in range(1,5):
+				setter = {1:glUniform1f, 2:glUniform2f, 3:glUniform3f, 4:glUniform4f}
+				if name in self.uniform_locations:
+					setter[l](self.uniform_locations[name], *vals)
+				else:
+					self.logger.error('No such uniform \'{}\''.format(name))
 			else:
-				self.logger.error('No such uniform \'{}\''.format(name))
-		else:
-			self.logger.warning('Nonvalid length for uniform \'{}\': {}'.format(uniform_name, l))
+				self.logger.warning('Nonvalid shape for uniform \'{}\': {}'.format(uniform_name, vals.shape))
+		elif dim == 2: # matrix
+			l1, l2 = vals.shape[0], vals.shape[1]
+			if l1 in range(2,5) and l2 in range(2,5):
+				setter = {(2,2):glUniformMatrix2fv, (3,3):glUniformMatrix3fv, (4,4):glUniformMatrix4fv, (2,3):glUniformMatrix2x3fv, (3,2):glUniformMatrix3x2fv, (2,4):glUniformMatrix2x4fv, (4,2):glUniformMatrix4x2fv, (3,4):glUniformMatrix3x4fv, (4,3):glUniformMatrix4x3fv}
+				if name in self.uniform_locations:
+					setter[l1,l2](self.uniform_locations[name], 1, False, vals)
+				else:
+					self.logger.error('No such uniform \'{}\''.format(name))
+			else:
+				self.logger.warning('Nonvalid shape for uniform \'{}\': {}'.format(uniform_name, vals.shape))
 
 	def set_uniforms(self, uniform_dict):
 		for name, value in uniform_dict.items():

@@ -21,7 +21,7 @@ class MainView:
 		fileConfig('log.conf')
 		self.logger = logging.getLogger(type(self).__name__)
 
-		self.resolution = (800,450)
+		self.resolution = np.array([800,450])
 		self.target_fps = 60
 		self.frame_render_time = 1/self.target_fps
 
@@ -50,7 +50,7 @@ class MainView:
 		self.logger.debug('Shader program initialized')
 
 	def init_camera(self):
-		self.camera = Camera()
+		self.camera = Camera(self)
 
 	def init_window(self):
 		glfw.init()
@@ -58,7 +58,8 @@ class MainView:
 		glfw.make_context_current(self.window)
 		glfw.set_window_size_callback(self.window, self.resize)
 		glfw.set_key_callback(self.window, self.keyboard_input)
-		glfw.set_scroll_callback(self.window, self.scroll_input);
+		glfw.set_scroll_callback(self.window, self.scroll_input)
+		glfw.set_cursor_pos_callback(self.window, self.mouse_position_input)
 		glClearColor(0,0,0,1)
 		self.target_frame_time = 1/self.target_fps
 
@@ -67,7 +68,7 @@ class MainView:
 
 	def resize(self, win, width, height):
 		#self.logger.debug('Window resized: {}x{}'.format(width, height))
-		self.resolution = (width, height)
+		self.resolution = np.array([width, height])
 		glViewport(0, 0, *self.resolution)
 
 	def keyboard_input(self, win, key, scancode, action, mods):
@@ -95,12 +96,22 @@ class MainView:
 		if key == glfw.KEY_P and action == glfw.PRESS:
 			self.freeze_time = not self.freeze_time
 			self.logger.info('Toggle time freeze')
+		if key == glfw.KEY_F and action == glfw.PRESS:
+			self.camera.toggle_look_mode()
+			self.logger.info('Toggle camera look mode')
+		if key == glfw.KEY_T and action == glfw.PRESS:
+			self.ui.toggle_composition_overlay()
+			self.logger.info('Toggle composition overlay')
 
 	def scroll_input(self, win, x, y):
 		if y > 0:
 			self.camera.accelerate()
 		elif y < 0:
 			self.camera.decelerate()
+
+	def mouse_position_input(self, win, x, y):
+		if self.camera.look_mode:
+			self.camera.look(x, y)
 
 	def wait_for_frame_end(self, frame_start_time):
 		frame_render_time = glfw.get_time()-frame_start_time
@@ -118,6 +129,7 @@ class MainView:
 
 	def main_loop(self):
 		while not glfw.window_should_close(self.window):
+			self.check_for_shader_change()
 			frame_start_time = glfw.get_time()
 			if not self.freeze_time:
 				self.time = frame_start_time
@@ -130,7 +142,8 @@ class MainView:
 				{
 					'resolution':self.resolution,
 					'time':self.time,
-					'camera_offset':self.camera.offset
+					'camera_position':self.camera.position,
+					'camera_rotation':self.camera.rotation.mat3()
 				}
 			)
 			glDrawArrays(GL_POINTS, 0, 1) # dummy vbo
@@ -141,16 +154,15 @@ class MainView:
 				{
 					'fps_label':'{:4.0f}/{:2.0f} FPS, {:4.1f} ms ({:3.0f}%)'.format(1/self.frame_render_time, self.target_fps, self.frame_render_time*1000, self.frame_render_time/self.target_frame_time*100),
 					'time_label':'Time: {:4.2f} s {}'.format(self.time, '[f]' if self.freeze_time else ''),
-					'camera_label':'Camera: [{:4.2f}, {:4.2f}, {:4.2f}] ({:.1f}%)'.format(*self.camera.offset, self.camera.speed*100)
+					'camera_label':'Camera: [{:5.2f}, {:5.2f}, {:5.2f}] ({:3.0f}%), [{:5.1f}, {:4.1f}]'.format(*self.camera.position, self.camera.speed*100, np.degrees(self.camera.yaw), np.degrees(self.camera.pitch))
 				}
 			)
 
 			glfw.swap_buffers(self.window)
-			self.check_for_shader_change()
 			self.wait_for_frame_end(frame_start_time)
 			glfw.poll_events()
-		glfw.terminate()
 
+		glfw.terminate()
 
 if __name__ == '__main__':
 	mv = MainView()

@@ -6,18 +6,18 @@ out vec4 FragColor;
 uniform float time;
 uniform vec2 resolution;
 
-uniform vec3 camera_offset;
+uniform vec3 camera_position;
+uniform mat3 camera_rotation;
 
 #define EPS 1e-4
 
 // http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
 highp float rand(vec2 co) {
-	float dt= dot(co.xy,vec2(12.9898,78.233));
+	float dt = dot(co.xy,vec2(12.9898,78.233));
 	return fract(sin(mod(dt,3.1416))*43758.5453);
 }
 
-mat3 camera(vec3 ro, vec3 t, float r) {
-	vec3 f = normalize(t-ro), u = vec3(sin(r),cos(r),0.);
+mat3 camera(vec3 f, vec3 u) {
 	return mat3(normalize(cross(f,u)), u, -f);
 }
 
@@ -112,31 +112,23 @@ void main(void) {
 
 	vec3 lp = vec3(-2.,3.5,3.5);
 	//vec3 ro = vec3(-1.5-.2*sin(time),-.2+.2*cos(time),1.+.8*cos(time));
-	vec3 ro = vec3(-1.5,-.2,1.);
-	vec3 t = vec3(-.2,-.3,-.2);
-	float rot = 0.;
+	vec3 ro = vec3(-1.65,-.04,.75);
 
 	// camera setup
-	vec3 f = normalize(t-ro);
-	vec3 u = vec3(sin(rot),cos(rot),0.);
-	vec3 r = cross(f,u);
-	mat3 c = mat3(r,u,-f);
-	vec3 rd = c * normalize(vec3(uv.xy, -1.));
+	mat3 c = camera(vec3(0.,0.,-1.), vec3(0.,1.,0.));
+	vec3 rd = c*normalize(vec3(uv.xy, -1.));
 
 	// camera control
-	ro += c*camera_offset;
+	ro += camera_position;
+	rd *= camera_rotation;
 
 	vec3 color;
-	if (abs(uv.y) < 0.4) {
-		vec3 p;
-		raytrace(ro,rd, p);
-		color = lighting(p, lp);
-	
-		float vignette = smoothstep(2.0, 2.0-0.45, length(uv));
-		color = mix(color, color*vignette, 0.3);
-	} else {
-		color = vec3(0.);
-	}
+	vec3 p;
+	raytrace(ro,rd, p);
+	color = lighting(p, lp);
+
+	float vignette = smoothstep(2.0, 2.0-0.45, length(uv));
+	color = mix(color, color*vignette, 0.3);
 	
 	FragColor = vec4((pow(color, vec3(1./1.3))+0.04*rand(3.*uv)), 1.);
 }

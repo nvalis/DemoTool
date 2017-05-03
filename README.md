@@ -1,6 +1,8 @@
 # DemoTool
 Demo tool with OpenGL 4.5 and glfw using a geometry shader to draw a fullscreen quad and rendering using raymarching in a fragment shader.
 
+![Screenshot](/assets/screenshot.png?raw=true "Screenshot")
+
 ## Features
 
  - hot-reload of the fragment shader for live coding
